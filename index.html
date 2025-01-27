@@ -39,7 +39,7 @@
         <h2>Live Statistics</h2>
         <p>Total Contacts: <strong><span id="totalContacts">0</span></strong></p>
         <p>Total Sales: <strong>৳<span id="totalSales">0</span></strong></p>
-        <p>Sales/Contact Ratio: <strong><span id="salesRatio">0%</span></strong></p>
+        <p>Successful Sales: <strong><span id="salesRatio">0</span></strong></p>
     </div>
 
     <form id="marketForm">
@@ -78,7 +78,7 @@
     </form>
 
     <script>
-        // Your Firebase Configuration
+        // Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyAG2FCJ5yq-fpzkIGPJNXhUmV4C0yBCLvw",
             authDomain: "bpdb-7917b.firebaseapp.com",
@@ -98,7 +98,7 @@
         const totalSalesSpan = document.getElementById('totalSales');
         const salesRatioSpan = document.getElementById('salesRatio');
 
-        // Toggle Amount Field
+        // Toggle Amount Field Visibility
         function toggleAmountField() {
             const saleMade = document.getElementById('saleMade').value;
             const amountField = document.getElementById('amountField');
@@ -118,20 +118,22 @@
         function updateStatistics() {
             db.collection('submissions').get().then((querySnapshot) => {
                 let totalContacts = 0;
-                let totalSales = 0;
+                let totalSalesAmount = 0;
+                let salesCount = 0;
 
                 querySnapshot.forEach((doc) => {
                     totalContacts++;
-                    if(doc.data().saleMade === 'yes' && doc.data().saleAmount) {
-                        totalSales += parseFloat(doc.data().saleAmount);
+                    if(doc.data().saleMade === 'yes') {
+                        salesCount++;
+                        if(doc.data().saleAmount) {
+                            totalSalesAmount += parseFloat(doc.data().saleAmount);
+                        }
                     }
                 });
 
                 totalContactsSpan.textContent = totalContacts;
-                totalSalesSpan.textContent = totalSales.toFixed(2);
-                salesRatioSpan.textContent = totalContacts > 0 
-                    ? `${((totalSales / totalContacts) * 100).toFixed(1)}%`
-                    : '0%';
+                totalSalesSpan.textContent = totalSalesAmount.toFixed(2);
+                salesRatioSpan.textContent = salesCount;
             });
         }
 
@@ -147,7 +149,6 @@
                 timestamp: new Date()
             };
 
-            // Validate Sale Amount if sale is made
             if(submissionData.saleMade === 'yes') {
                 const amount = parseFloat(document.getElementById('saleAmount').value);
                 if(isNaN(amount) || amount <= 0) {
@@ -161,7 +162,7 @@
                 await db.collection('submissions').add(submissionData);
                 alert('Data submitted successfully!');
                 document.getElementById('marketForm').reset();
-                toggleAmountField(); // Reset field visibility
+                toggleAmountField();
                 updateStatistics();
             } catch (error) {
                 console.error('Firestore Error:', error);
