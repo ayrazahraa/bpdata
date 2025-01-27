@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Activation Form</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; }
+        .stats { background: #f5f5f5; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { 
+            width: 100%; 
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button { 
+            background: #007BFF; 
+            color: white; 
+            padding: 12px 25px;
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        button:hover { background: #0056b3; }
+        #amountField { display: none; margin-top: 10px; }
+        .required { color: red; margin-left: 3px; }
+    </style>
+</head>
+<body>
+    <div class="stats">
+        <h2>Live Statistics</h2>
+        <p>Total Contacts: <strong><span id="totalContacts">0</span></strong></p>
+        <p>Total Sales: <strong>৳<span id="totalSales">0</span></strong></p>
+        <p>Sales/Contact Ratio: <strong><span id="salesRatio">0%</span></strong></p>
+    </div>
+
+    <form id="marketForm">
+        <div class="form-group">
+            <label>Market Name <span class="required">*</span></label>
+            <input type="text" id="marketName" required>
+        </div>
+
+        <div class="form-group">
+            <label>Customer Name <span class="required">*</span></label>
+            <input type="text" id="customerName" required>
+        </div>
+
+        <div class="form-group">
+            <label>Mobile Number <span class="required">*</span></label>
+            <input type="tel" id="mobileNumber" 
+                   pattern="[+]{0,1}[0-9]{11,14}" 
+                   placeholder="+88017XXXXXXXX" 
+                   required>
+        </div>
+
+        <div class="form-group">
+            <label>Sale Made? <span class="required">*</span></label>
+            <select id="saleMade" required onchange="toggleAmountField()">
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+            </select>
+        </div>
+
+        <div class="form-group" id="amountField">
+            <label>Sale Amount (BDT) <span class="required">*</span></label>
+            <input type="number" id="saleAmount" step="0.01" min="0">
+        </div>
+
+        <button type="submit">Submit Data</button>
+    </form>
+
+    <script>
+        // Your Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAG2FCJ5yq-fpzkIGPJNXhUmV4C0yBCLvw",
+            authDomain: "bpdb-7917b.firebaseapp.com",
+            projectId: "bpdb-7917b",
+            storageBucket: "bpdb-7917b.firebasestorage.app",
+            messagingSenderId: "257010241868",
+            appId: "1:257010241868:web:051531214d73c21558bfe9",
+            measurementId: "G-TMETXCTQGL"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // DOM Elements
+        const totalContactsSpan = document.getElementById('totalContacts');
+        const totalSalesSpan = document.getElementById('totalSales');
+        const salesRatioSpan = document.getElementById('salesRatio');
+
+        // Toggle Amount Field
+        function toggleAmountField() {
+            const saleMade = document.getElementById('saleMade').value;
+            const amountField = document.getElementById('amountField');
+            const amountInput = document.getElementById('saleAmount');
+            
+            if(saleMade === 'yes') {
+                amountField.style.display = 'block';
+                amountInput.setAttribute('required', 'true');
+            } else {
+                amountField.style.display = 'none';
+                amountInput.removeAttribute('required');
+                amountInput.value = '';
+            }
+        }
+
+        // Update Statistics
+        function updateStatistics() {
+            db.collection('submissions').get().then((querySnapshot) => {
+                let totalContacts = 0;
+                let totalSales = 0;
+
+                querySnapshot.forEach((doc) => {
+                    totalContacts++;
+                    if(doc.data().saleMade === 'yes' && doc.data().saleAmount) {
+                        totalSales += parseFloat(doc.data().saleAmount);
+                    }
+                });
+
+                totalContactsSpan.textContent = totalContacts;
+                totalSalesSpan.textContent = totalSales.toFixed(2);
+                salesRatioSpan.textContent = totalContacts > 0 
+                    ? `${((totalSales / totalContacts) * 100).toFixed(1)}%`
+                    : '0%';
+            });
+        }
+
+        // Form Submission Handler
+        document.getElementById('marketForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submissionData = {
+                marketName: document.getElementById('marketName').value.trim(),
+                customerName: document.getElementById('customerName').value.trim(),
+                mobileNumber: document.getElementById('mobileNumber').value.trim(),
+                saleMade: document.getElementById('saleMade').value,
+                timestamp: new Date()
+            };
+
+            // Validate Sale Amount if sale is made
+            if(submissionData.saleMade === 'yes') {
+                const amount = parseFloat(document.getElementById('saleAmount').value);
+                if(isNaN(amount) || amount <= 0) {
+                    alert('Please enter a valid sale amount');
+                    return;
+                }
+                submissionData.saleAmount = amount;
+            }
+
+            try {
+                await db.collection('submissions').add(submissionData);
+                alert('Data submitted successfully!');
+                document.getElementById('marketForm').reset();
+                toggleAmountField(); // Reset field visibility
+                updateStatistics();
+            } catch (error) {
+                console.error('Firestore Error:', error);
+                alert('Submission failed. Please check console for details.');
+            }
+        });
+
+        // Initial statistics load
+        updateStatistics();
+    </script>
+</body>
+</html>
